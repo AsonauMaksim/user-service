@@ -17,4 +17,6 @@ public interface CardInfoRepository extends JpaRepository<CardInfo, Long> {
 
     @Query(value = "SELECT * FROM card_info WHERE number LIKE :prefix%", nativeQuery = true)
     List<CardInfo> findByNumberPrefix(String prefix);
+
+    boolean existsByNumber(String number);
 }
