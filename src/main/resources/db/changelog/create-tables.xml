@@ -2,99 +2,84 @@
 <databaseChangeLog
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.4.xsd">
+        xsi:schemaLocation="
+          http://www.liquibase.org/xml/ns/dbchangelog
+          https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.4.xsd">
 
-    <changeSet id="1-create-users-table" author="maksim-asonau">
+    <!-- 1. table users -->
+    <changeSet id="001-create-users" author="maksim-asonau">
         <createTable tableName="users">
-            <column name="id" type="BIGINT" autoIncrement="true">
+            <column name="id"         type="BIGINT"      autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="name" type="VARCHAR(50)">
+            <column name="name"       type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
-            <column name="surname" type="VARCHAR(50)"/>
+            <column name="surname"    type="VARCHAR(50)"/>
             <column name="birth_date" type="DATE">
                 <constraints nullable="false"/>
             </column>
-            <column name="email" type="VARCHAR(255)">
+            <column name="email"      type="VARCHAR(255)">
                 <constraints nullable="false" unique="true"/>
             </column>
         </createTable>
+
+        <sql>
+            ALTER TABLE users
+                ADD CONSTRAINT chk_birth_date_not_future
+                    CHECK (birth_date &lt;= CURRENT_DATE);
+        </sql>
+
+        <sql>
+            ALTER TABLE users
+                ADD CONSTRAINT chk_email_format
+                    CHECK (
+                        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+                );
+        </sql>
     </changeSet>
 
-    <changeSet id="2-create-card-info-table" author="maksim-asonau">
+    <!-- 2. table card_info -->
+    <changeSet id="002-create-card-info" author="maksim-asonau">
         <createTable tableName="card_info">
-            <column name="id" type="BIGINT" autoIncrement="true">
+            <column name="id"   type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
+
             <column name="user_id" type="BIGINT">
-                <constraints nullable="false" foreignKeyName="fk_card_user"
+                <constraints nullable="false"
+                             foreignKeyName="fk_card_user"
                              referencedTableName="users"
                              referencedColumnNames="id"/>
             </column>
-            <column name="number" type="CHAR(16)">
+
+            <column name="number" type="VARCHAR(16)">
                 <constraints nullable="false" unique="true"/>
             </column>
+
             <column name="holder" type="VARCHAR(100)">
                 <constraints nullable="false"/>
             </column>
-            <column name="expiration_date" type="CHAR(5)">
+
+            <column name="expiration_date" type="VARCHAR(5)">
                 <constraints nullable="false"/>
             </column>
         </createTable>
 
-        <createIndex indexName="idx_user_id" tableName="card_info">
+        <createIndex tableName="card_info" indexName="idx_card_user">
             <column name="user_id"/>
         </createIndex>
-    </changeSet>
 
-    <changeSet id="3-check-birth-date" author="maksim-asonau">
         <sql>
-            ALTER TABLE users ADD CONSTRAINT chk_birth_date_not_future
-                CHECK (birth_date &lt;= CURRENT_DATE);
+            ALTER TABLE card_info
+                ADD CONSTRAINT chk_card_number_digits
+                    CHECK (number ~ '^[0-9]{16}$');
         </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE users DROP CONSTRAINT chk_birth_date_not_future;
-            </sql>
-        </rollback>
-    </changeSet>
 
-    <changeSet id="4-check-email-format" author="maksim-asonau">
         <sql>
-            ALTER TABLE users ADD CONSTRAINT chk_email_format
-                CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
+            ALTER TABLE card_info
+                ADD CONSTRAINT chk_expiration_format
+                    CHECK (expiration_date ~ '^(0[1-9]|1[0-2])/[0-9]{2}$');
         </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE users DROP CONSTRAINT chk_email_format;
-            </sql>
-        </rollback>
     </changeSet>
-
-    <changeSet id="5-check-expiration-date-format" author="maksim-asonau">
-        <sql>
-            ALTER TABLE card_info ADD CONSTRAINT chk_expiration_format
-                CHECK (expiration_date ~ '^(0[1-9]|1[0-2])/\\d{2}$');
-        </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE card_info DROP CONSTRAINT chk_expiration_format;
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="6-check-card-number-format" author="maksim-asonau">
-        <sql>
-            ALTER TABLE card_info ADD CONSTRAINT chk_card_number_digits
-                CHECK (number ~ '^\\d{16}$');
-        </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE card_info DROP CONSTRAINT chk_card_number_digits;
-            </sql>
-        </rollback>
-    </changeSet>
-
 </databaseChangeLog>
