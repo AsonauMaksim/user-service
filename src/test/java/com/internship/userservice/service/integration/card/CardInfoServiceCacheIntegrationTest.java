@@ -71,7 +71,9 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
                 .get(savedCard.getId());
 
         assertThat(cached).isNotNull();
+        assert cached != null;
         CardInfoResponse cachedCard = (CardInfoResponse) cached.get();
+        assert cachedCard != null;
         assertThat(cachedCard.getNumber()).isEqualTo("1111222233334444");
     }
 
@@ -90,7 +92,8 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
         Cache.ValueWrapper beforeUpdate = Objects.requireNonNull(cacheManager.getCache(CARDS_CACHE))
                 .get(savedCard.getId());
         assertThat(beforeUpdate).isNotNull();
-        assertThat(((CardInfoResponse) beforeUpdate.get()).getHolder()).isEqualTo("Max Ivanov");
+        assert beforeUpdate != null;
+        assertThat(((CardInfoResponse) Objects.requireNonNull(beforeUpdate.get())).getHolder()).isEqualTo("Max Ivanov");
 
         CardInfoRequest updateRequest = CardInfoRequest.builder()
                 .userId(savedUser.getId())
@@ -104,7 +107,9 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
                 .get(savedCard.getId());
         assertThat(afterUpdate).isNotNull();
 
+        assert afterUpdate != null;
         CardInfoResponse updated = (CardInfoResponse) afterUpdate.get();
+        assert updated != null;
         assertThat(updated.getHolder()).isEqualTo("Sveta Svetikova");
         assertThat(updated.getExpirationDate()).isEqualTo("12/30");
     }
@@ -129,7 +134,7 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
 
         cardInfoService.delete(cardId);
 
-        Cache.ValueWrapper cachedAfterDelete = cacheManager.getCache(CARDS_CACHE).get(cardId);
+        Cache.ValueWrapper cachedAfterDelete = Objects.requireNonNull(cacheManager.getCache(CARDS_CACHE)).get(cardId);
         assertThat(cachedAfterDelete).isNull();
     }
 }

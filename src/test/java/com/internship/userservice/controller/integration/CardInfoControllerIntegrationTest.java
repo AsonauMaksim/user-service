@@ -149,14 +149,14 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
         User user = createDefaultUser();
 
-        CardInfo card1 = cardRepository.save(CardInfo.builder()
+        cardRepository.save(CardInfo.builder()
                 .user(user)
                 .number("1111222233334444")
                 .holder("User Card One")
                 .expirationDate("08/27")
                 .build());
 
-        CardInfo card2 = cardRepository.save(CardInfo.builder()
+        cardRepository.save(CardInfo.builder()
                 .user(user)
                 .number("5555666677778888")
                 .holder("User Card Two")

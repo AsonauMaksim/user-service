@@ -72,6 +72,7 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
         Cache.ValueWrapper cachedAfterUpdate = Objects.requireNonNull(cacheManager.getCache(USERS_CACHE)).get(userId);
         assertThat(cachedAfterUpdate).isNotNull();
         UserResponse cachedUser = (UserResponse) cachedAfterUpdate.get();
+        assert cachedUser != null;
         assertThat(cachedUser.getName()).isEqualTo("Updated");
         assertThat(cachedUser.getSurname()).isEqualTo("User");
         assertThat(cachedUser.getBirthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
