@@ -9,6 +9,7 @@ import com.internship.userservice.mapper.UserMapper;
 import com.internship.userservice.repository.UserRepository;
 import com.internship.userservice.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
