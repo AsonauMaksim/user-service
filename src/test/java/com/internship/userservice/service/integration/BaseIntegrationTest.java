@@ -1,40 +1,49 @@
 package com.internship.userservice.service.integration;
 
+import com.internship.userservice.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
 @Testcontainers
-@TestPropertySource(locations = "classpath:application-test.yml")
+@SpringBootTest
+@ActiveProfiles("test")
+@AutoConfigureMockMvc
 public abstract class BaseIntegrationTest {
 
-    static boolean isCi = System.getenv("GITHUB_ACTIONS") != null;
+    private static final String POSTGRES_IMAGE = "postgres:16";
+    private static final String REDIS_IMAGE = "redis:7.2";
 
     @Container
-    static final PostgreSQLContainer<?> postgres =
-            !isCi ? new PostgreSQLContainer<>("postgres:16")
+    protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
+            new PostgreSQLContainer<>(POSTGRES_IMAGE)
                     .withDatabaseName("user_db_test")
                     .withUsername("test_user")
-                    .withPassword("test_password") : null;
+                    .withPassword("test_password");
 
     @Container
-    static final GenericContainer<?> redis =
-            !isCi ? new GenericContainer<>("redis:7.2")
-                    .withExposedPorts(6379) : null;
+    protected static final GenericContainer<?> REDIS_CONTAINER =
+            new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
+                    .withExposedPorts(6379);
 
-    static {
-        if (!isCi) {
-            postgres.start();
-            redis.start();
-            System.setProperty("spring.datasource.url", postgres.getJdbcUrl());
-            System.setProperty("spring.datasource.username", postgres.getUsername());
-            System.setProperty("spring.datasource.password", postgres.getPassword());
-            System.setProperty("spring.redis.host", redis.getHost());
-            System.setProperty("spring.redis.port", String.valueOf(redis.getFirstMappedPort()));
-        }
+    @Autowired
+    protected UserRepository userRepository;
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
+        registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
+
+        registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS_CONTAINER.getMappedPort(6379));
     }
 }
