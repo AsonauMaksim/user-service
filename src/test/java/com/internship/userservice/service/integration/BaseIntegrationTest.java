@@ -1,15 +1,19 @@
 package com.internship.userservice.service.integration;
 
 import com.internship.userservice.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+
+import java.util.Objects;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -37,6 +41,14 @@ public abstract class BaseIntegrationTest {
     @Autowired
     protected UserRepository userRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    @BeforeEach
+    void clearCache() {
+        Objects.requireNonNull(cacheManager.getCache("usersCache")).clear();
+        Objects.requireNonNull(cacheManager.getCache("cardsCache")).clear();
+    }
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
