@@ -14,6 +14,7 @@ import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -256,6 +257,13 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     private UserRequest createUserRequest() {
+//        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+//        return UserRequest.builder()
+//                .name("Max_" + uniqueSuffix)
+//                .surname("Ivanov")
+//                .birthDate(LocalDate.of(1995, 10, 17))
+//                .email("max_" + uniqueSuffix + "@gmail.com")
+//                .build();
         return UserRequest.builder()
                 .name("Max")
                 .surname("Ivanov")

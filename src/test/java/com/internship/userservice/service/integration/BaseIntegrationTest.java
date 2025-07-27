@@ -47,14 +47,9 @@ public abstract class BaseIntegrationTest {
 
     @BeforeEach
     void clearCache() {
-        Objects.requireNonNull(cacheManager.getCache("usersCache")).clear();
-        Objects.requireNonNull(cacheManager.getCache("cardsCache")).clear();
-    }
-
-    @AfterEach
-    void clearCacheAfter() {
-        Objects.requireNonNull(cacheManager.getCache("usersCache")).clear();
-        Objects.requireNonNull(cacheManager.getCache("cardsCache")).clear();
+        cacheManager.getCacheNames().forEach(name -> {
+            Objects.requireNonNull(cacheManager.getCache(name)).clear();
+        });
     }
 
     @DynamicPropertySource
