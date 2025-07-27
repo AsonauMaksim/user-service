@@ -2,7 +2,7 @@ name: User Service CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/user-service-testing-containerization-ci-pipeline ]
   pull_request:
     branches: [ main ]
 
