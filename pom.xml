@@ -190,7 +190,7 @@
                 </configuration>
             </plugin>
 
-            <!-- ✅ Jacoco for coverage -->
+            <!-- Jacoco for coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>

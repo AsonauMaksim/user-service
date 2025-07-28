@@ -99,3 +99,34 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.java.binaries=target/classes \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+  docker-image:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: sonar-analysis
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Extract version from pom.xml
+        run: echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Build Docker image
+        run: docker build -t zabungalilovo/user-service:${{ env.VERSION }} .
+
+      - name: Push Docker image
+        run: docker push zabungalilovo/user-service:${{ env.VERSION }}
