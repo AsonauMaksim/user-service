@@ -14,7 +14,6 @@ import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -199,7 +198,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("second@gmail.com")
                 .build();
 
-        UserResponse savedUser1 = userService.create(user1);
+        userService.create(user1);
         UserResponse savedUser2 = userService.create(user2);
 
         UserRequest updateRequest = UserRequest.builder()
