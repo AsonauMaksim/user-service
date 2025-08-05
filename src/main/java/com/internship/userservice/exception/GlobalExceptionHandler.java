@@ -13,7 +13,6 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Основной build() — с поддержкой поля errors
     private ApiError build(HttpStatus status, String msg, String path, List<String> errors) {
         return ApiError.builder()
                 .timestamp(LocalDateTime.now())
@@ -25,7 +24,6 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
-    // Упрощённая версия для обычных исключений (без списка errors)
     private ApiError build(HttpStatus status, String msg, String path) {
         return build(status, msg, path, null);
     }
