@@ -36,6 +36,9 @@ public class User {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "user_credentials_id")
+    private Long userCredentialsId;
+
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
