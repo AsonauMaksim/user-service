@@ -4,6 +4,7 @@ spring:
 
   datasource:
     url: jdbc:postgresql://postgres:5432/user_db
+#    url: jdbc:postgresql://localhost:5432/user_db !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     username: postgres
     password: 12345
     driver-class-name: org.postgresql.Driver
@@ -26,8 +27,13 @@ spring:
   data:
     redis:
       host: redis
+#      host: localhost !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       port: 6379
       timeout: 60000
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-ms: 3600000
 
 server:
   port: 8081

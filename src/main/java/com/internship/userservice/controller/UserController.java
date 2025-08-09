@@ -30,39 +30,45 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest dto) {
+
         UserResponse saved = userService.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
+
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
     @GetMapping("/by-email")
     public ResponseEntity<UserResponse> getByEmail(@RequestParam String email) {
+
         return ResponseEntity.ok(userService.getUserByEmail(email));
     }
 
     @GetMapping
     public ResponseEntity<List<UserResponse>> getByIds(@RequestParam List<Long> ids) {
+
         return ResponseEntity.ok(userService.getUsersByIds(ids));
     }
 
     @GetMapping("/all")
     public ResponseEntity<List<UserResponse>> getAll() {
+
         List<UserResponse> users = userService.getAllUsers();
         return ResponseEntity.ok(users);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id,
-                                               @Valid @RequestBody UserRequest dto) {
+    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest dto) {
+
         return ResponseEntity.ok(userService.updateUserById(id, dto));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
+
         userService.deleteUserById(id);
         return ResponseEntity.noContent().build();
     }
