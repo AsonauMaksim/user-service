@@ -111,4 +111,11 @@ public class UserServiceImpl implements UserService {
     public List<UserResponse> getAllUsers() {
         return userMapper.toDtoList(userRepository.findAll());
     }
+
+    @Override
+    public UserResponse getByUserCredentialsId(Long userCredentialsId) {
+        User user = userRepository.findByUserCredentialsId(userCredentialsId)
+                .orElseThrow(() -> new NotFoundException("User with credentials id=" + userCredentialsId + " not found"));
+        return userMapper.toDto(user);
+    }
 }

@@ -329,4 +329,23 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("max@gmail.com")
                 .build();
     }
+
+    @Test
+    void getByUserCredentialsId_ShouldReturnUser_WhenExists() {
+
+        User user = User.builder()
+                .userCredentialsId(555L)
+                .name("Alice")
+                .surname("Smith")
+                .birthDate(LocalDate.of(1995, 5, 5))
+                .email("alice.smith@example.com")
+                .build();
+        user = userRepository.save(user);
+
+        UserResponse response = userService.getByUserCredentialsId(555L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(user.getId());
+        assertThat(response.getEmail()).isEqualTo(user.getEmail());
+    }
 }

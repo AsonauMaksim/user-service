@@ -101,6 +101,7 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.java.binaries=target/classes \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.branch.name=${GITHUB_REF_NAME}
 
   docker-image:
     name: Build & Push Docker Image

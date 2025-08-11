@@ -72,4 +72,10 @@ public class UserController {
         userService.deleteUserById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/by-credentials-id/{userCredentialsId}")
+    public ResponseEntity<UserResponse> getByUserCredentialsId(@PathVariable Long userCredentialsId) {
+
+        return ResponseEntity.ok(userService.getByUserCredentialsId(userCredentialsId));
+    }
 }

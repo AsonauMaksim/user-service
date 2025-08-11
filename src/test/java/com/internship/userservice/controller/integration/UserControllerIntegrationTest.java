@@ -308,4 +308,26 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("User id=1488 not found"))
                 .andExpect(jsonPath("$.path").value("/api/users/1488"));
     }
+
+    @Test
+    void getByUserCredentialsId_ShouldReturnUser_WhenExists() throws Exception {
+
+        User user = User.builder()
+                .userCredentialsId(AUTH_SUBJECT_ID)
+                .name("Bob")
+                .surname("Brown")
+                .birthDate(LocalDate.of(1980, 3, 20))
+                .email("bob.brown@example.com")
+                .build();
+        user = userRepository.save(user);
+
+        mockMvc.perform(get("/api/users/by-credentials-id/" + AUTH_SUBJECT_ID)
+                        .header(AUTH_HEADER, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(user.getId()))
+                .andExpect(jsonPath("$.email").value(user.getEmail()))
+                .andExpect(jsonPath("$.name").value("Bob"))
+                .andExpect(jsonPath("$.surname").value("Brown"))
+                .andExpect(jsonPath("$.birthDate").value("1980-03-20"));
+    }
 }

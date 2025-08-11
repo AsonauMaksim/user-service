@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -465,5 +466,45 @@ public class UserServiceImplTest {
         verify(userRepository).findById(userId);
         verify(userRepository, never()).delete(any());
         jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+    }
+
+    @Test
+    void getByUserCredentialsId_ShouldReturnUser_WhenUserExists() {
+
+        Long credentialsId = 123L;
+        User user = User.builder()
+                .id(1L)
+                .userCredentialsId(credentialsId)
+                .name("Test")
+                .surname("User")
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .email("test@example.com")
+                .build();
+
+        when(userRepository.findByUserCredentialsId(credentialsId)).thenReturn(Optional.of(user));
+        when(userMapper.toDto(user)).thenReturn(UserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .surname(user.getSurname())
+                .birthDate(user.getBirthDate())
+                .email(user.getEmail())
+                .build());
+
+        UserResponse response = userService.getByUserCredentialsId(credentialsId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(user.getId());
+        assertThat(response.getEmail()).isEqualTo(user.getEmail());
+    }
+
+    @Test
+    void getByUserCredentialsId_ShouldThrowNotFoundException_WhenUserNotFound() {
+
+        Long credentialsId = 123L;
+        when(userRepository.findByUserCredentialsId(credentialsId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getByUserCredentialsId(credentialsId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("User with credentials id=" + credentialsId + " not found");
     }
 }
