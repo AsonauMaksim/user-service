@@ -17,4 +17,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(value = "SELECT * FROM users WHERE email ILIKE %:domain", nativeQuery = true)
     List<User> findAllByEmailDomain(@Param("domain") String domain);
+
+    Optional<User> findByUserCredentialsId(Long userCredentialsId);
 }
