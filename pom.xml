@@ -23,7 +23,6 @@
         <lombok.version>1.18.38</lombok.version>
     </properties>
 
-
     <dependencies>
         <!-- Spring -->
         <dependency>

@@ -13,6 +13,7 @@ import com.internship.userservice.repository.UserRepository;
 import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.CardInfoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -30,6 +31,14 @@ public class CardInfoServiceImpl implements CardInfoService {
     private final CardInfoRepository cardInfoRepository;
     private final UserRepository userRepository;
     private final CardInfoMapper cardInfoMapper;
+    private final CacheManager cacheManager;
+
+    private void evictUserCaches(User user) {
+        var users = cacheManager.getCache("users");
+        var usersByEmail = cacheManager.getCache("usersByEmail");
+        if (users != null) users.evict(user.getId());
+        if (usersByEmail != null) usersByEmail.evict(user.getEmail());
+    }
 
     @Override
     @Transactional
@@ -48,6 +57,8 @@ public class CardInfoServiceImpl implements CardInfoService {
         card.setUser(owner);
 
         card = cardInfoRepository.save(card);
+        evictUserCaches(owner);
+
         return cardInfoMapper.toDto(card);
     }
 
@@ -72,7 +83,6 @@ public class CardInfoServiceImpl implements CardInfoService {
     @Transactional
     @CachePut(value = "cards", key = "#id")
     public CardInfoResponse update(Long id, CardInfoRequest dto) {
-
         Long userCredentialsId = JwtUtils.getUserCredentialsIdFromToken();
 
         CardInfo card = cardInfoRepository.findById(id)
@@ -90,6 +100,8 @@ public class CardInfoServiceImpl implements CardInfoService {
         cardInfoMapper.updateEntity(card, dto);
         card = cardInfoRepository.save(card);
 
+        evictUserCaches(card.getUser());
+
         return cardInfoMapper.toDto(card);
     }
 
@@ -97,7 +109,6 @@ public class CardInfoServiceImpl implements CardInfoService {
     @Transactional
     @CacheEvict(value = "cards", key = "#id")
     public void delete(Long id) {
-
         Long userCredentialsId = JwtUtils.getUserCredentialsIdFromToken();
 
         CardInfo card = cardInfoRepository.findById(id)
@@ -108,5 +119,7 @@ public class CardInfoServiceImpl implements CardInfoService {
         }
 
         cardInfoRepository.deleteById(id);
+
+        evictUserCaches(card.getUser());
     }
 }

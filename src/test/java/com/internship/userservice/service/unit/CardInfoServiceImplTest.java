@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,13 +40,26 @@ public class CardInfoServiceImplTest {
     private CardInfoMapper cardInfoMapper;
     private CardInfoServiceImpl cardInfoService;
     private MockedStatic<JwtUtils> jwtUtilsMock;
+    private CacheManager cacheManager;
+    private Cache usersCache;
+    private Cache usersByEmailCache;
+
 
     @BeforeEach
     void setUp() {
         cardInfoRepository = mock(CardInfoRepository.class);
         userRepository = mock(UserRepository.class);
         cardInfoMapper = mock(CardInfoMapper.class);
-        cardInfoService = new CardInfoServiceImpl(cardInfoRepository, userRepository, cardInfoMapper);
+
+        cacheManager = mock(CacheManager.class);
+        usersCache = mock(Cache.class);
+        usersByEmailCache = mock(Cache.class);
+        when(cacheManager.getCache("users")).thenReturn(usersCache);
+        when(cacheManager.getCache("usersByEmail")).thenReturn(usersByEmailCache);
+
+        cardInfoService = new CardInfoServiceImpl(
+                cardInfoRepository, userRepository, cardInfoMapper, cacheManager
+        );
 
         jwtUtilsMock = mockStatic(JwtUtils.class);
         jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(AUTH_USER_CRED_ID);
