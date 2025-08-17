@@ -5,16 +5,24 @@ import com.internship.userservice.dto.user.UserRequest;
 import com.internship.userservice.dto.user.UserResponse;
 import com.internship.userservice.entity.User;
 import com.internship.userservice.repository.UserRepository;
+import com.internship.userservice.service.JwtService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
+
+
 import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -27,6 +35,10 @@ import static org.hamcrest.Matchers.hasItem;
 @Sql(scripts = "classpath:/sql/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
+    private static final long AUTH_SUBJECT_ID = 777L;
+    private static final String AUTH_HEADER = "Authorization";
+    private static final String BEARER = "Bearer test-token";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -36,11 +48,33 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @MockBean
+    private JwtService jwtService;
+
+    @BeforeEach
+    void mockJwt() {
+
+        when(jwtService.isTokenValid(anyString())).thenReturn(true);
+        when(jwtService.extractUserId(anyString())).thenReturn(AUTH_SUBJECT_ID);
+    }
+
+    private UserRequest createUserRequest() {
+
+        return UserRequest.builder()
+                .name("Max")
+                .surname("Ivanov")
+                .birthDate(LocalDate.of(1995, 10, 17))
+                .email("max@gmail.com")
+                .build();
+    }
+
     @Test
     void createUser_ShouldReturn201AndSaveUser() throws Exception {
+
         UserRequest request = createUserRequest();
 
         mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -66,6 +100,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -80,34 +115,34 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getUserById_ShouldReturn200AndUser_WhenExists() throws Exception {
-        UserRequest request = createUserRequest();
-        String json = objectMapper.writeValueAsString(request);
 
         String responseJson = mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json))
+                        .content(objectMapper.writeValueAsString(createUserRequest())))
                 .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andReturn().getResponse().getContentAsString();
 
         UserResponse created = objectMapper.readValue(responseJson, UserResponse.class);
 
-        mockMvc.perform(get("/api/users/{id}", created.getId()))
+        mockMvc.perform(get("/api/users/{id}", created.getId())
+                        .header(AUTH_HEADER, BEARER))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(created.getId()))
-                .andExpect(jsonPath("$.name").value(request.getName()))
-                .andExpect(jsonPath("$.surname").value(request.getSurname()))
-                .andExpect(jsonPath("$.email").value(request.getEmail()))
-                .andExpect(jsonPath("$.birthDate").value(request.getBirthDate().toString()));
+                .andExpect(jsonPath("$.name").value("Max"))
+                .andExpect(jsonPath("$.surname").value("Ivanov"))
+                .andExpect(jsonPath("$.email").value("max@gmail.com"))
+                .andExpect(jsonPath("$.birthDate").value("1995-10-17"));
     }
 
     @Test
     void getUserById_ShouldReturn404_WhenUserNotFound() throws Exception {
+
         long nonExistingId = 1488L;
 
-        mockMvc.perform(get("/api/users/{id}", nonExistingId))
+        mockMvc.perform(get("/api/users/{id}", nonExistingId)
+                        .header(AUTH_HEADER, BEARER))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -124,6 +159,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .surname("Wonderland")
                 .email("alice@example.com")
                 .birthDate(LocalDate.of(1990, 1, 1))
+                .userCredentialsId(AUTH_SUBJECT_ID)
                 .build());
 
         userRepository.save(User.builder()
@@ -131,9 +167,11 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .surname("Builder")
                 .email("bob@example.com")
                 .birthDate(LocalDate.of(1985, 5, 20))
+                .userCredentialsId(AUTH_SUBJECT_ID)
                 .build());
 
-        mockMvc.perform(get("/api/users/all"))
+        mockMvc.perform(get("/api/users/all")
+                        .header(AUTH_HEADER, BEARER))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.length()").value(2))
@@ -144,12 +182,20 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUser_ShouldReturn200AndUpdatedUser_WhenValid() throws Exception {
 
-        User saved = userRepository.save(User.builder()
-                .name("OldName")
-                .surname("OldSurname")
-                .email("old@gmail.com")
-                .birthDate(LocalDate.of(1990, 1, 1))
-                .build());
+        String createdJson = mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                UserRequest.builder()
+                                        .name("OldName")
+                                        .surname("OldSurname")
+                                        .email("old@gmail.com")
+                                        .birthDate(LocalDate.of(1990, 1, 1))
+                                        .build())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        UserResponse created = objectMapper.readValue(createdJson, UserResponse.class);
 
         UserRequest updateRequest = UserRequest.builder()
                 .name("NewName")
@@ -158,11 +204,12 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .birthDate(LocalDate.of(1995, 5, 5))
                 .build();
 
-        mockMvc.perform(put("/api/users/{id}", saved.getId())
+        mockMvc.perform(put("/api/users/{id}", created.getId())
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(saved.getId()))
+                .andExpect(jsonPath("$.id").value(created.getId()))
                 .andExpect(jsonPath("$.name").value("NewName"))
                 .andExpect(jsonPath("$.email").value("new@gmail.com"));
     }
@@ -170,12 +217,20 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUser_ShouldReturn400_WhenInvalidInput() throws Exception {
 
-        User saved = userRepository.save(User.builder()
-                .name("Valid")
-                .surname("User")
-                .email("valid@example.com")
-                .birthDate(LocalDate.of(1990, 1, 1))
-                .build());
+        String createdJson = mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                UserRequest.builder()
+                                        .name("Valid")
+                                        .surname("User")
+                                        .email("valid@example.com")
+                                        .birthDate(LocalDate.of(1990, 1, 1))
+                                        .build())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        UserResponse created = objectMapper.readValue(createdJson, UserResponse.class);
 
         UserRequest invalidUpdate = UserRequest.builder()
                 .name("")
@@ -184,7 +239,8 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .birthDate(LocalDate.now().plusDays(10))
                 .build();
 
-        mockMvc.perform(put("/api/users/{id}", saved.getId())
+        mockMvc.perform(put("/api/users/{id}", created.getId())
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidUpdate)))
                 .andExpect(status().isBadRequest())
@@ -208,6 +264,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/users/{id}", nonExistentId)
+                        .header(AUTH_HEADER, BEARER)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -221,25 +278,29 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void deleteUser_ShouldReturn204_WhenUserDeleted() throws Exception {
 
-        User saved = userRepository.save(User.builder()
-                .name("DeleteMe")
-                .surname("Test")
-                .email("delete@example.com")
-                .birthDate(LocalDate.of(1990, 1, 1))
-                .build());
+        String createdJson = mockMvc.perform(post("/api/users")
+                        .header(AUTH_HEADER, BEARER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createUserRequest())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
 
-        mockMvc.perform(delete("/api/users/{id}", saved.getId()))
+        UserResponse created = objectMapper.readValue(createdJson, UserResponse.class);
+
+        mockMvc.perform(delete("/api/users/{id}", created.getId())
+                        .header(AUTH_HEADER, BEARER))
                 .andExpect(status().isNoContent());
 
-        assertThat(userRepository.findById(saved.getId())).isEmpty();
+        assertThat(userRepository.findById(created.getId())).isEmpty();
     }
-
 
     @Test
     void deleteUser_ShouldReturn404_WhenUserNotFound() throws Exception {
+
         long nonExistingId = 1488L;
 
-        mockMvc.perform(delete("/api/users/{id}", nonExistingId))
+        mockMvc.perform(delete("/api/users/{id}", nonExistingId)
+                        .header(AUTH_HEADER, BEARER))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -248,13 +309,25 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/users/1488"));
     }
 
+    @Test
+    void getByUserCredentialsId_ShouldReturnUser_WhenExists() throws Exception {
 
-    private UserRequest createUserRequest() {
-        return UserRequest.builder()
-                .name("Max")
-                .surname("Ivanov")
-                .birthDate(LocalDate.of(1995, 10, 17))
-                .email("max@gmail.com")
+        User user = User.builder()
+                .userCredentialsId(AUTH_SUBJECT_ID)
+                .name("Bob")
+                .surname("Brown")
+                .birthDate(LocalDate.of(1980, 3, 20))
+                .email("bob.brown@example.com")
                 .build();
+        user = userRepository.save(user);
+
+        mockMvc.perform(get("/api/users/by-credentials-id/" + AUTH_SUBJECT_ID)
+                        .header(AUTH_HEADER, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(user.getId()))
+                .andExpect(jsonPath("$.email").value(user.getEmail()))
+                .andExpect(jsonPath("$.name").value("Bob"))
+                .andExpect(jsonPath("$.surname").value("Brown"))
+                .andExpect(jsonPath("$.birthDate").value("1980-03-20"));
     }
 }

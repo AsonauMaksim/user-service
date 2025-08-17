@@ -14,7 +14,6 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface CardInfoMapper {
 
-    @Mapping(target = "user.id", source = "userId")
     CardInfo toEntity(CardInfoRequest dto);
 
     @Mapping(target = "userId", source = "user.id")
@@ -23,6 +22,5 @@ public interface CardInfoMapper {
     List<CardInfoResponse> toDtoList(List<CardInfo> cards);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "user.id", source = "userId")
     void updateEntity(@MappingTarget CardInfo entity, CardInfoRequest dto);
 }
