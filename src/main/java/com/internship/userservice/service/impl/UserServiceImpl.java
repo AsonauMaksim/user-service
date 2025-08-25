@@ -7,11 +7,13 @@ import com.internship.userservice.exception.AlreadyExistsException;
 import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.mapper.UserMapper;
 import com.internship.userservice.repository.UserRepository;
+import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,16 +30,23 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse create(UserRequest dto) {
+
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new AlreadyExistsException("User with email '" + dto.getEmail() + "' already exists");
         }
+
+        Long authId = JwtUtils.getUserCredentialsIdFromToken();
+
         User user = userMapper.toEntity(dto);
+        user.setUserCredentialsId(authId);
+
         return userMapper.toDto(userRepository.save(user));
     }
 
     @Override
     @Cacheable(value = "users", key = "#id")
     public UserResponse getUserById(Long id) {
+
         return userMapper.toDto(userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User id=" + id + " not found")));
     }
@@ -45,6 +54,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Cacheable(value = "usersByEmail", key = "#email")
     public UserResponse getUserByEmail(String email) {
+
         return userMapper.toDto(userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User email=" + email + " not found"))
         );
@@ -52,6 +62,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponse> getUsersByIds(List<Long> ids) {
+
         return userMapper.toDtoList(userRepository.findAllById(ids));
     }
 
@@ -60,14 +71,23 @@ public class UserServiceImpl implements UserService {
     @CachePut(value = "users", key = "#id")
     @CacheEvict(value = "usersByEmail", key = "#dto.email")
     public UserResponse updateUserById(Long id, UserRequest dto) {
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User id=" + id + " not found"));
 
-        if (!user.getEmail().equals(dto.getEmail()) && userRepository.findByEmail(dto.getEmail()).isPresent()) {
+        Long authId = JwtUtils.getUserCredentialsIdFromToken();
+
+        if (!authId.equals(user.getUserCredentialsId())) {
+            throw new AccessDeniedException("Access denied");
+        }
+
+        if (!user.getEmail().equals(dto.getEmail()) &&
+                userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new AlreadyExistsException("Email '" + dto.getEmail() + "' already in use");
         }
 
         userMapper.updateEntity(user, dto);
+
         return userMapper.toDto(user);
     }
 
@@ -75,14 +95,27 @@ public class UserServiceImpl implements UserService {
     @Override
     @CacheEvict(value = "users", key = "#id")
     public void deleteUserById(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new NotFoundException("User id=" + id + " not found");
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User id=" + id + " not found"));
+
+        Long authId = JwtUtils.getUserCredentialsIdFromToken();
+        if (!authId.equals(user.getUserCredentialsId())) {
+            throw new AccessDeniedException("Access denied");
         }
-        userRepository.deleteById(id);
+
+        userRepository.delete(user);
     }
 
     @Override
     public List<UserResponse> getAllUsers() {
         return userMapper.toDtoList(userRepository.findAll());
+    }
+
+    @Override
+    public UserResponse getByUserCredentialsId(Long userCredentialsId) {
+        User user = userRepository.findByUserCredentialsId(userCredentialsId)
+                .orElseThrow(() -> new NotFoundException("User with credentials id=" + userCredentialsId + " not found"));
+        return userMapper.toDto(user);
     }
 }

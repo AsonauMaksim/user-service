@@ -20,5 +20,7 @@ public interface UserService {
     void deleteUserById(Long id);
 
     List<UserResponse> getAllUsers();
+
+    UserResponse getByUserCredentialsId(Long userCredentialsId);
 }
 

@@ -1,23 +1,17 @@
 package com.internship.userservice.dto.card;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CardInfoRequest {
-
-    @NotNull(message = "User id is required")
-    private Long userId;
 
     @NotBlank
     @Pattern(regexp = "\\d{16}", message = "Card number must be 16 digits")
