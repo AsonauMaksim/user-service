@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,8 +30,10 @@ public class CardInfoController {
     private final CardInfoService cardService;
 
     @PostMapping
-    public ResponseEntity<CardInfoResponse> create(@Valid @RequestBody CardInfoRequest dto) {
-        CardInfoResponse saved = cardService.create(dto);
+    public ResponseEntity<CardInfoResponse> create(
+            @Valid @RequestBody CardInfoRequest dto,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
+        CardInfoResponse saved = cardService.create(dto, userCredentialsId);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
@@ -50,14 +53,18 @@ public class CardInfoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CardInfoResponse> update(@PathVariable Long id,
-                                                   @Valid @RequestBody CardInfoRequest dto) {
-        return ResponseEntity.ok(cardService.update(id, dto));
+    public ResponseEntity<CardInfoResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody CardInfoRequest dto,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
+        return ResponseEntity.ok(cardService.update(id, dto, userCredentialsId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        cardService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
+        cardService.delete(id, userCredentialsId);
         return ResponseEntity.noContent().build();
     }
 }

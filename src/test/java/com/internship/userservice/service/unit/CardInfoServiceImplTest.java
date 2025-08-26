@@ -9,12 +9,9 @@ import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.mapper.CardInfoMapper;
 import com.internship.userservice.repository.CardInfoRepository;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.impl.CardInfoServiceImpl;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
@@ -25,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -39,11 +35,9 @@ public class CardInfoServiceImplTest {
     private UserRepository userRepository;
     private CardInfoMapper cardInfoMapper;
     private CardInfoServiceImpl cardInfoService;
-    private MockedStatic<JwtUtils> jwtUtilsMock;
     private CacheManager cacheManager;
     private Cache usersCache;
     private Cache usersByEmailCache;
-
 
     @BeforeEach
     void setUp() {
@@ -60,19 +54,10 @@ public class CardInfoServiceImplTest {
         cardInfoService = new CardInfoServiceImpl(
                 cardInfoRepository, userRepository, cardInfoMapper, cacheManager
         );
-
-        jwtUtilsMock = mockStatic(JwtUtils.class);
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(AUTH_USER_CRED_ID);
-    }
-
-    @AfterEach
-    void tearDown() {
-        jwtUtilsMock.close();
     }
 
     @Test
     void create_ShouldCreateCard_WhenDataIsValid() {
-
         CardInfoRequest request = new CardInfoRequest();
         request.setNumber("1234567890123456");
         request.setHolder("JOHN DOE");
@@ -104,7 +89,7 @@ public class CardInfoServiceImplTest {
         when(cardInfoRepository.save(cardToSave)).thenReturn(saved);
         when(cardInfoMapper.toDto(saved)).thenReturn(expected);
 
-        CardInfoResponse result = cardInfoService.create(request);
+        CardInfoResponse result = cardInfoService.create(request, AUTH_USER_CRED_ID);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(10L);
@@ -115,12 +100,10 @@ public class CardInfoServiceImplTest {
         verify(cardInfoMapper).toEntity(request);
         verify(cardInfoRepository).save(cardToSave);
         verify(cardInfoMapper).toDto(saved);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void create_ShouldThrowAlreadyExistsException_WhenCardNumberExists() {
-
         CardInfoRequest request = new CardInfoRequest();
         request.setNumber("1111222233334444");
         request.setHolder("JANE DOE");
@@ -133,19 +116,17 @@ public class CardInfoServiceImplTest {
         when(userRepository.findByUserCredentialsId(AUTH_USER_CRED_ID)).thenReturn(Optional.of(owner));
         when(cardInfoRepository.existsByNumber("1111222233334444")).thenReturn(true);
 
-        assertThatThrownBy(() -> cardInfoService.create(request))
+        assertThatThrownBy(() -> cardInfoService.create(request, AUTH_USER_CRED_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("Card number '1111222233334444' already exists");
 
         verify(userRepository).findByUserCredentialsId(AUTH_USER_CRED_ID);
         verify(cardInfoRepository).existsByNumber("1111222233334444");
         verifyNoMoreInteractions(cardInfoMapper, cardInfoRepository);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void create_ShouldThrowNotFoundException_WhenOwnerUserNotFound() {
-
         CardInfoRequest request = new CardInfoRequest();
         request.setNumber("1111222233334444");
         request.setHolder("JANE DOE");
@@ -153,18 +134,16 @@ public class CardInfoServiceImplTest {
 
         when(userRepository.findByUserCredentialsId(AUTH_USER_CRED_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cardInfoService.create(request))
+        assertThatThrownBy(() -> cardInfoService.create(request, AUTH_USER_CRED_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User with credentials id=" + AUTH_USER_CRED_ID + " not found");
 
         verify(userRepository).findByUserCredentialsId(AUTH_USER_CRED_ID);
         verifyNoMoreInteractions(cardInfoRepository, cardInfoMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void getCardById_ShouldReturnCard_WhenExists() {
-
         Long cardId = 100L;
 
         CardInfo card = new CardInfo();
@@ -190,7 +169,6 @@ public class CardInfoServiceImplTest {
 
     @Test
     void getCardById_ShouldThrowNotFoundException_WhenNotExists() {
-
         Long cardId = 1488L;
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.empty());
 
@@ -204,7 +182,6 @@ public class CardInfoServiceImplTest {
 
     @Test
     void getAllByIds_ShouldReturnListOfCards_WhenCardsExist() {
-
         List<Long> ids = List.of(1L, 2L);
 
         CardInfo c1 = new CardInfo(); c1.setId(1L); c1.setNumber("1111222233334444");
@@ -230,7 +207,6 @@ public class CardInfoServiceImplTest {
 
     @Test
     void getByUserId_ShouldReturnListOfCards_WhenCardsExist() {
-
         Long userId = 7L;
 
         CardInfo c1 = new CardInfo(); c1.setId(10L); c1.setNumber("1111222233334444");
@@ -256,7 +232,6 @@ public class CardInfoServiceImplTest {
 
     @Test
     void update_ShouldUpdateCard_WhenOwnerMatches_AndNumberChangesToUnique() {
-
         Long cardId = 1L;
 
         User owner = new User();
@@ -287,7 +262,7 @@ public class CardInfoServiceImplTest {
         when(cardInfoRepository.save(existing)).thenReturn(saved);
         when(cardInfoMapper.toDto(saved)).thenReturn(resp);
 
-        CardInfoResponse result = cardInfoService.update(cardId, dto);
+        CardInfoResponse result = cardInfoService.update(cardId, dto, AUTH_USER_CRED_ID);
 
         assertThat(result).isNotNull();
         assertThat(result.getNumber()).isEqualTo("4444333322221111");
@@ -297,12 +272,10 @@ public class CardInfoServiceImplTest {
         verify(cardInfoMapper).updateEntity(existing, dto);
         verify(cardInfoRepository).save(existing);
         verify(cardInfoMapper).toDto(saved);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void update_ShouldUpdate_WhenNumberNotChanged() {
-
         Long cardId = 1L;
 
         User owner = new User();
@@ -332,23 +305,20 @@ public class CardInfoServiceImplTest {
         when(cardInfoRepository.save(existing)).thenReturn(saved);
         when(cardInfoMapper.toDto(saved)).thenReturn(resp);
 
-        CardInfoResponse result = cardInfoService.update(cardId, dto);
+        CardInfoResponse result = cardInfoService.update(cardId, dto, AUTH_USER_CRED_ID);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(cardId);
 
         verify(cardInfoRepository).findById(cardId);
-
         verify(cardInfoRepository, never()).existsByNumber(any());
         verify(cardInfoMapper).updateEntity(existing, dto);
         verify(cardInfoRepository).save(existing);
         verify(cardInfoMapper).toDto(saved);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void update_ShouldThrowAlreadyExists_WhenNewNumberAlreadyExists() {
-
         Long cardId = 1L;
 
         User owner = new User();
@@ -368,7 +338,7 @@ public class CardInfoServiceImplTest {
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.of(existing));
         when(cardInfoRepository.existsByNumber("4444333322221111")).thenReturn(true);
 
-        assertThatThrownBy(() -> cardInfoService.update(cardId, dto))
+        assertThatThrownBy(() -> cardInfoService.update(cardId, dto, AUTH_USER_CRED_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("Card number '4444333322221111' already exists");
 
@@ -376,12 +346,10 @@ public class CardInfoServiceImplTest {
         verify(cardInfoRepository).existsByNumber("4444333322221111");
         verify(cardInfoRepository, never()).save(any());
         verifyNoMoreInteractions(cardInfoMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void update_ShouldThrowAccessDenied_WhenOwnerMismatch() {
-
         Long cardId = 1L;
 
         User owner = new User();
@@ -398,10 +366,9 @@ public class CardInfoServiceImplTest {
         dto.setHolder("HOLDER");
         dto.setExpirationDate("01/29");
 
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(999L);
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> cardInfoService.update(cardId, dto))
+        assertThatThrownBy(() -> cardInfoService.update(cardId, dto, AUTH_USER_CRED_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
@@ -409,12 +376,10 @@ public class CardInfoServiceImplTest {
         verify(cardInfoRepository, never()).existsByNumber(any());
         verify(cardInfoRepository, never()).save(any());
         verifyNoMoreInteractions(cardInfoMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void update_ShouldThrowNotFound_WhenCardMissing() {
-
         Long cardId = 999L;
 
         CardInfoRequest dto = new CardInfoRequest();
@@ -424,18 +389,16 @@ public class CardInfoServiceImplTest {
 
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cardInfoService.update(cardId, dto))
+        assertThatThrownBy(() -> cardInfoService.update(cardId, dto, AUTH_USER_CRED_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Card id=999 not found");
 
         verify(cardInfoRepository).findById(cardId);
         verifyNoMoreInteractions(cardInfoRepository, cardInfoMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void delete_ShouldDelete_WhenOwnerMatches() {
-
         Long cardId = 1L;
 
         User owner = new User();
@@ -448,26 +411,23 @@ public class CardInfoServiceImplTest {
 
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.of(card));
 
-        cardInfoService.delete(cardId);
+        cardInfoService.delete(cardId, AUTH_USER_CRED_ID);
 
         verify(cardInfoRepository).findById(cardId);
         verify(cardInfoRepository).deleteById(cardId);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
     void delete_ShouldThrowNotFound_WhenCardMissing() {
-
         Long cardId = 1488L;
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cardInfoService.delete(cardId))
+        assertThatThrownBy(() -> cardInfoService.delete(cardId, AUTH_USER_CRED_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Card id=1488 not found");
 
         verify(cardInfoRepository).findById(cardId);
         verify(cardInfoRepository, never()).deleteById(any());
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
@@ -482,16 +442,13 @@ public class CardInfoServiceImplTest {
         card.setId(cardId);
         card.setUser(owner);
 
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(999L);
         when(cardInfoRepository.findById(cardId)).thenReturn(Optional.of(card));
 
-        assertThatThrownBy(() -> cardInfoService.delete(cardId))
+        assertThatThrownBy(() -> cardInfoService.delete(cardId, AUTH_USER_CRED_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(cardInfoRepository).findById(cardId);
         verify(cardInfoRepository, never()).deleteById(any());
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 }
-

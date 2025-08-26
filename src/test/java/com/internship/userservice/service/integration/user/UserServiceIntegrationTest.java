@@ -8,15 +8,11 @@ import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.repository.UserRepository;
 import com.internship.userservice.service.UserService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,26 +30,11 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    private void authenticateAs(long userCredentialsId) {
-
-        var auth = new UsernamePasswordAuthenticationToken(
-                String.valueOf(userCredentialsId), null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
-    @AfterEach
-    void clearCtx() {
-        SecurityContextHolder.clearContext();
-    }
-
     @Test
     void createUser_ShouldPersistUserInDatabase() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest request = createUserRequest();
 
-        UserResponse response = userService.create(request);
+        UserResponse response = userService.create(request, OWNER_AUTH_ID);
 
         assertThat(response).isNotNull();
         assertThat(response.getEmail()).isEqualTo(request.getEmail());
@@ -71,13 +52,10 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void createUser_ShouldThrowAlreadyExistsException_WhenEmailAlreadyExists() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest request = createUserRequest();
-        userService.create(request);
+        userService.create(request, OWNER_AUTH_ID);
 
-        assertThatThrownBy(() -> userService.create(request))
+        assertThatThrownBy(() -> userService.create(request, OWNER_AUTH_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("User with email");
     }
@@ -85,10 +63,8 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void getUserById_ShouldReturnUser_WhenUserExists() {
 
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest request = createUserRequest();
-        UserResponse createdUser = userService.create(request);
+        UserResponse createdUser = userService.create(request, OWNER_AUTH_ID);
 
         UserResponse fetchedUser = userService.getUserById(createdUser.getId());
 
@@ -118,10 +94,8 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void getUserByEmail_ShouldReturnUser_WhenEmailExists() {
 
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest request = createUserRequest();
-        UserResponse created = userService.create(request);
+        UserResponse created = userService.create(request, OWNER_AUTH_ID);
 
         UserResponse found = userService.getUserByEmail("max@gmail.com");
 
@@ -146,10 +120,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void getUsersByIds_ShouldReturnUsers_WhenIdsExist() {
 
-        authenticateAs(OWNER_AUTH_ID);
         UserRequest user1 = createUserRequest();
-
-        authenticateAs(OTHER_AUTH_ID);
         UserRequest user2 = UserRequest.builder()
                 .name("Sveta")
                 .surname("Svetikova")
@@ -157,8 +128,8 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("sveta@gmail.com")
                 .build();
 
-        UserResponse savedUser1 = userService.create(user1);
-        UserResponse savedUser2 = userService.create(user2);
+        UserResponse savedUser1 = userService.create(user1, OWNER_AUTH_ID);
+        UserResponse savedUser2 = userService.create(user2, OTHER_AUTH_ID);
 
         List<UserResponse> foundUsers = userService.getUsersByIds(List.of(savedUser1.getId(), savedUser2.getId()));
 
@@ -166,6 +137,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(foundUsers).extracting(UserResponse::getEmail)
                 .containsExactlyInAnyOrder("max@gmail.com", "sveta@gmail.com");
     }
+
 
     @Test
     void getUsersByIds_ShouldReturnEmptyList_WhenNoIdsMatch() {
@@ -178,8 +150,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUserById_ShouldUpdateUser_WhenDataIsValid_AndOwnerMatches() {
 
-        authenticateAs(OWNER_AUTH_ID);
-        UserResponse savedUser = userService.create(createUserRequest());
+        UserResponse savedUser = userService.create(createUserRequest(), OWNER_AUTH_ID);
 
         UserRequest updateRequest = UserRequest.builder()
                 .name("Maxim")
@@ -188,8 +159,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("max@gmail.com")
                 .build();
 
-        authenticateAs(OWNER_AUTH_ID);
-        UserResponse updated = userService.updateUserById(savedUser.getId(), updateRequest);
+        UserResponse updated = userService.updateUserById(savedUser.getId(), updateRequest, OWNER_AUTH_ID);
 
         assertThat(updated).isNotNull();
         assertThat(updated.getName()).isEqualTo("Maxim");
@@ -199,11 +169,9 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUserById_ShouldThrowException_WhenUserNotFound() {
 
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest updateRequest = createUserRequest();
 
-        assertThatThrownBy(() -> userService.updateUserById(1488L, updateRequest))
+        assertThatThrownBy(() -> userService.updateUserById(1488L, updateRequest, OWNER_AUTH_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User id=1488 not found");
     }
@@ -211,7 +179,6 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUserById_ShouldThrowException_WhenEmailAlreadyUsedByAnotherUser() {
 
-        authenticateAs(OWNER_AUTH_ID);
         UserRequest user1 = UserRequest.builder()
                 .name("User1")
                 .surname("One")
@@ -219,7 +186,6 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("first@gmail.com")
                 .build();
 
-        authenticateAs(OTHER_AUTH_ID);
         UserRequest user2 = UserRequest.builder()
                 .name("User2")
                 .surname("Two")
@@ -227,10 +193,9 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("second@gmail.com")
                 .build();
 
-        userService.create(user1);
-        UserResponse savedUser2 = userService.create(user2);
+        userService.create(user1, OWNER_AUTH_ID);
+        UserResponse savedUser2 = userService.create(user2, OTHER_AUTH_ID);
 
-        authenticateAs(OTHER_AUTH_ID);
         UserRequest updateRequest = UserRequest.builder()
                 .name("User2")
                 .surname("Two")
@@ -238,7 +203,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("first@gmail.com")
                 .build();
 
-        assertThatThrownBy(() -> userService.updateUserById(savedUser2.getId(), updateRequest))
+        assertThatThrownBy(() -> userService.updateUserById(savedUser2.getId(), updateRequest, OTHER_AUTH_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("Email 'first@gmail.com' already in use");
     }
@@ -246,10 +211,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void updateUserById_ShouldThrowAccessDenied_WhenOwnerMismatch() {
 
-        authenticateAs(OWNER_AUTH_ID);
-        UserResponse saved = userService.create(createUserRequest());
-
-        authenticateAs(OTHER_AUTH_ID);
+        UserResponse saved = userService.create(createUserRequest(), OWNER_AUTH_ID);
 
         UserRequest updateRequest = UserRequest.builder()
                 .name("Hacker")
@@ -258,7 +220,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("max@gmail.com")
                 .build();
 
-        assertThatThrownBy(() -> userService.updateUserById(saved.getId(), updateRequest))
+        assertThatThrownBy(() -> userService.updateUserById(saved.getId(), updateRequest, OTHER_AUTH_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }
@@ -266,11 +228,9 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void deleteUserById_ShouldDeleteUser_WhenOwnerMatches() {
 
-        authenticateAs(OWNER_AUTH_ID);
-        UserResponse savedUser = userService.create(createUserRequest());
+        UserResponse savedUser = userService.create(createUserRequest(), OWNER_AUTH_ID);
 
-        authenticateAs(OWNER_AUTH_ID);
-        userService.deleteUserById(savedUser.getId());
+        userService.deleteUserById(savedUser.getId(), OWNER_AUTH_ID);
 
         boolean exists = userRepository.existsById(savedUser.getId());
         assertThat(exists).isFalse();
@@ -279,7 +239,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void deleteUserById_ShouldThrowException_WhenUserDoesNotExist() {
 
-        assertThatThrownBy(() -> userService.deleteUserById(1488L))
+        assertThatThrownBy(() -> userService.deleteUserById(1488L, OWNER_AUTH_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User id=1488 not found");
     }
@@ -287,11 +247,9 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void deleteUserById_ShouldThrowAccessDenied_WhenOwnerMismatch() {
 
-        authenticateAs(OWNER_AUTH_ID);
-        UserResponse saved = userService.create(createUserRequest());
+        UserResponse saved = userService.create(createUserRequest(), OWNER_AUTH_ID);
 
-        authenticateAs(OTHER_AUTH_ID);
-        assertThatThrownBy(() -> userService.deleteUserById(saved.getId()))
+        assertThatThrownBy(() -> userService.deleteUserById(saved.getId(), OTHER_AUTH_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }
@@ -299,10 +257,7 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void getAllUsers_ShouldReturnAllSavedUsers() {
 
-        authenticateAs(OWNER_AUTH_ID);
         UserRequest user1 = createUserRequest();
-
-        authenticateAs(OTHER_AUTH_ID);
         UserRequest user2 = UserRequest.builder()
                 .name("Sveta")
                 .surname("Svetikova")
@@ -310,8 +265,8 @@ public class UserServiceIntegrationTest extends BaseIntegrationTest {
                 .email("sveta@gmail.com")
                 .build();
 
-        userService.create(user1);
-        userService.create(user2);
+        userService.create(user1, OWNER_AUTH_ID);
+        userService.create(user2, OTHER_AUTH_ID);
 
         List<UserResponse> allUsers = userService.getAllUsers();
 

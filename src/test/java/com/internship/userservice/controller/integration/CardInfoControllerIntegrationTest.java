@@ -6,12 +6,9 @@ import com.internship.userservice.entity.CardInfo;
 import com.internship.userservice.entity.User;
 import com.internship.userservice.repository.CardInfoRepository;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.service.JwtService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,8 +17,6 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -34,8 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     private static final long OWNER_AUTH_ID = 100L;
-    private static final String AUTH_HEADER = "Authorization";
-    private static final String BEARER = "Bearer test-token";
+    private static final String USER_ID_HEADER = "X-User-Id";
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,24 +43,14 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @MockBean
-    private JwtService jwtService;
-
-    @BeforeEach
-    void mockJwt() {
-        when(jwtService.isTokenValid(anyString())).thenReturn(true);
-        when(jwtService.extractUserId(anyString())).thenReturn(OWNER_AUTH_ID);
-    }
-
     @Test
     void createCard_ShouldReturn201AndSaveCard() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfoRequest request = createCardRequest();
 
         mockMvc.perform(post("/api/cards")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -83,13 +67,12 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void createCard_ShouldReturn400_WhenInvalidInput() throws Exception {
-
         createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfoRequest invalidRequest = createInvalidCardRequest();
 
         mockMvc.perform(post("/api/cards")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
@@ -102,10 +85,8 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(cardRepository.findAll()).isEmpty();
     }
 
-
     @Test
     void getCardById_ShouldReturn200AndCard_WhenCardExists() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
         CardInfo card = cardRepository.save(CardInfo.builder()
                 .user(user)
@@ -115,7 +96,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         mockMvc.perform(get("/api/cards/{id}", card.getId())
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(card.getId()))
@@ -127,11 +108,10 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getCardById_ShouldReturn404_WhenCardNotFound() throws Exception {
-
         Long nonExistingId = 1488L;
 
         mockMvc.perform(get("/api/cards/{id}", nonExistingId)
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -140,10 +120,8 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/cards/1488"));
     }
 
-
     @Test
     void getCardsByIds_ShouldReturn200AndListOfCards() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfo card1 = cardRepository.save(CardInfo.builder()
@@ -161,7 +139,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         mockMvc.perform(get("/api/cards")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .param("ids", card1.getId().toString(), card2.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -170,10 +148,8 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$[1].id").value(card2.getId()));
     }
 
-
     @Test
     void getByUserId_ShouldReturn200AndCardsOfUser() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         cardRepository.save(CardInfo.builder()
@@ -191,7 +167,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         mockMvc.perform(get("/api/cards/by-user/{userId}", user.getId())
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.length()").value(2))
@@ -199,10 +175,8 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$[1].userId").value(user.getId()));
     }
 
-
     @Test
     void updateCard_ShouldReturn200AndUpdatedCard_WhenCardExists() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfo savedCard = cardRepository.save(CardInfo.builder()
@@ -219,7 +193,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/cards/{id}", savedCard.getId())
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -238,14 +212,13 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateCard_ShouldReturn404_WhenCardNotFound() throws Exception {
-
         createDefaultUserWithAuthId(OWNER_AUTH_ID);
         Long nonExistingId = 1488L;
 
         CardInfoRequest updateRequest = createCardRequest();
 
         mockMvc.perform(put("/api/cards/{id}", nonExistingId)
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isNotFound())
@@ -258,7 +231,6 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateCard_ShouldReturn400_WhenInvalidInput() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfo savedCard = cardRepository.save(CardInfo.builder()
@@ -271,7 +243,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
         CardInfoRequest invalidRequest = createInvalidCardRequest();
 
         mockMvc.perform(put("/api/cards/{id}", savedCard.getId())
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
@@ -289,7 +261,6 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void deleteCard_ShouldReturn204AndRemoveCard() throws Exception {
-
         User user = createDefaultUserWithAuthId(OWNER_AUTH_ID);
 
         CardInfo savedCard = cardRepository.save(CardInfo.builder()
@@ -300,7 +271,7 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         mockMvc.perform(delete("/api/cards/{id}", savedCard.getId())
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID))
                 .andExpect(status().isNoContent());
 
         assertThat(cardRepository.findById(savedCard.getId())).isEmpty();
@@ -308,12 +279,11 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void deleteCard_ShouldReturn404_WhenCardNotFound() throws Exception {
-
         createDefaultUserWithAuthId(OWNER_AUTH_ID);
         long nonExistingId = 1488;
 
         mockMvc.perform(delete("/api/cards/{id}", nonExistingId)
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, OWNER_AUTH_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -323,7 +293,6 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private User createDefaultUserWithAuthId(long userCredentialsId) {
-
         return userRepository.save(User.builder()
                 .name("Max")
                 .surname("Ivanov")
@@ -334,7 +303,6 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private CardInfoRequest createCardRequest() {
-
         return CardInfoRequest.builder()
                 .number("1234567812345678")
                 .holder("Test Holder")
@@ -343,7 +311,6 @@ public class CardInfoControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private CardInfoRequest createInvalidCardRequest() {
-
         return CardInfoRequest.builder()
                 .number("123")
                 .holder("")

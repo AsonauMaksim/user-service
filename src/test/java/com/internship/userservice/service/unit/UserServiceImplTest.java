@@ -7,12 +7,9 @@ import com.internship.userservice.exception.AlreadyExistsException;
 import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.mapper.UserMapper;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.impl.UserServiceImpl;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,10 +17,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -33,19 +28,12 @@ public class UserServiceImplTest {
     private UserRepository userRepository;
     private UserMapper userMapper;
     private UserServiceImpl userService;
-    private MockedStatic<JwtUtils> jwtUtilsMock;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         userMapper = mock(UserMapper.class);
         userService = new UserServiceImpl(userRepository, userMapper);
-        jwtUtilsMock = mockStatic(JwtUtils.class);
-    }
-
-    @AfterEach
-    void tearDown() {
-        jwtUtilsMock.close();
     }
 
     @Test
@@ -71,9 +59,7 @@ public class UserServiceImplTest {
         when(userRepository.save(userToSave)).thenReturn(savedUser);
         when(userMapper.toDto(savedUser)).thenReturn(expectedResponse);
 
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(100L);
-
-        UserResponse result = userService.create(request);
+        UserResponse result = userService.create(request, 100L);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(1L);
@@ -84,29 +70,22 @@ public class UserServiceImplTest {
         verify(userMapper).toEntity(request);
         verify(userRepository).save(userToSave);
         verify(userMapper).toDto(savedUser);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
-    void create_ShouldThrowAlreadyExistsException_WhenEmailAlreadyExists() {
+    void create_ShouldThrowAlreadyExistsException_WhenEmailExists() {
 
         UserRequest request = new UserRequest();
         request.setEmail("maks@gmail.com");
 
-        User existingUser = new User();
-        existingUser.setId(2L);
-        existingUser.setEmail("maks@gmail.com");
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(new User()));
 
-        when(userRepository.findByEmail("maks@gmail.com"))
-                .thenReturn(Optional.of(existingUser));
-
-        assertThatThrownBy(() -> userService.create(request))
+        assertThatThrownBy(() -> userService.create(request, 100L))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("User with email 'maks@gmail.com' already exists");
 
         verify(userRepository).findByEmail("maks@gmail.com");
         verifyNoMoreInteractions(userMapper, userRepository);
-        jwtUtilsMock.verifyNoInteractions();
     }
 
     @Test
@@ -270,202 +249,179 @@ public class UserServiceImplTest {
     void updateUserById_ShouldUpdate_WhenOwnerAndEmailUnchanged() {
 
         Long userId = 1L;
-        Long authId = 100L;
+        UserRequest updateRequest = new UserRequest();
+        updateRequest.setEmail("maks@gmail.com");
 
-        UserRequest request = new UserRequest();
-        request.setEmail("maks@gmail.com");
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(100L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setEmail("maks@gmail.com");
-        existing.setUserCredentialsId(authId);
+        UserResponse expectedResponse = new UserResponse();
+        expectedResponse.setId(userId);
+        expectedResponse.setEmail("maks@gmail.com");
 
-        UserResponse expected = new UserResponse();
-        expected.setId(userId);
-        expected.setEmail("maks@gmail.com");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
+        doNothing().when(userMapper).updateEntity(existingUser, updateRequest);
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+        when(userMapper.toDto(existingUser)).thenReturn(expectedResponse);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        when(userMapper.toDto(existing)).thenReturn(expected);
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(authId);
-
-        UserResponse result = userService.updateUserById(userId, request);
+        UserResponse result = userService.updateUserById(userId, updateRequest, 100L);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(userId);
         assertThat(result.getEmail()).isEqualTo("maks@gmail.com");
 
         verify(userRepository).findById(userId);
-        verify(userMapper).updateEntity(existing, request);
-        verify(userMapper).toDto(existing);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+        verify(userMapper).updateEntity(existingUser, updateRequest);
+        verify(userMapper).toDto(existingUser);
     }
 
     @Test
     void updateUserById_ShouldUpdate_WhenOwnerAndEmailChangedToUnique() {
 
         Long userId = 1L;
-        Long authId = 100L;
+        UserRequest updateRequest = new UserRequest();
+        updateRequest.setEmail("new@gmail.com");
 
-        UserRequest request = new UserRequest();
-        request.setEmail("new@mail.com");
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(100L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setEmail("old@mail.com");
-        existing.setUserCredentialsId(authId);
+        UserResponse expectedResponse = new UserResponse();
+        expectedResponse.setId(userId);
+        expectedResponse.setEmail("new@gmail.com");
 
-        UserResponse expected = new UserResponse();
-        expected.setId(userId);
-        expected.setEmail("new@mail.com");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
+        when(userRepository.findByEmail("new@gmail.com")).thenReturn(Optional.empty());
+        doNothing().when(userMapper).updateEntity(existingUser, updateRequest);
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+        when(userMapper.toDto(existingUser)).thenReturn(expectedResponse);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        when(userRepository.findByEmail("new@mail.com")).thenReturn(Optional.empty());
-        when(userMapper.toDto(existing)).thenReturn(expected);
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(authId);
-
-        UserResponse result = userService.updateUserById(userId, request);
+        UserResponse result = userService.updateUserById(userId, updateRequest, 100L);
 
         assertThat(result).isNotNull();
-        assertThat(result.getEmail()).isEqualTo("new@mail.com");
+        assertThat(result.getId()).isEqualTo(userId);
+        assertThat(result.getEmail()).isEqualTo("new@gmail.com");
 
         verify(userRepository).findById(userId);
-        verify(userRepository).findByEmail("new@mail.com");
-        verify(userMapper).updateEntity(existing, request);
-        verify(userMapper).toDto(existing);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+        verify(userRepository).findByEmail("new@gmail.com");
+        verify(userMapper).updateEntity(existingUser, updateRequest);
+        verify(userMapper).toDto(existingUser);
     }
 
     @Test
-    void updateUserById_ShouldThrowAlreadyExists_WhenEmailAlreadyInUseByAnother() {
-
+    void updateUserById_ShouldThrowAlreadyExistsException_WhenEmailIsUsedByOther() {
         Long userId = 1L;
-        Long authId = 100L;
+        UserRequest updateRequest = new UserRequest();
+        updateRequest.setEmail("other@gmail.com");
 
-        UserRequest request = new UserRequest();
-        request.setEmail("busy@mail.com");
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(100L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setEmail("old@mail.com");
-        existing.setUserCredentialsId(authId);
+        User otherUser = new User();
+        otherUser.setId(2L);
+        otherUser.setEmail("other@gmail.com");
 
-        User another = new User();
-        another.setId(2L);
-        another.setEmail("busy@mail.com");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
+        when(userRepository.findByEmail("other@gmail.com")).thenReturn(Optional.of(otherUser));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        when(userRepository.findByEmail("busy@mail.com")).thenReturn(Optional.of(another));
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(authId);
-
-        assertThatThrownBy(() -> userService.updateUserById(userId, request))
+        assertThatThrownBy(() -> userService.updateUserById(userId, updateRequest, 100L))
                 .isInstanceOf(AlreadyExistsException.class)
-                .hasMessageContaining("Email 'busy@mail.com' already in use");
+                .hasMessageContaining("Email 'other@gmail.com' already in use");
 
         verify(userRepository).findById(userId);
-        verify(userRepository).findByEmail("busy@mail.com");
-        verifyNoMoreInteractions(userMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+        verify(userRepository).findByEmail("other@gmail.com");
+        verifyNoMoreInteractions(userRepository, userMapper);
     }
 
     @Test
-    void updateUserById_ShouldThrowAccessDenied_WhenOwnerMismatch() {
-
+    void updateUserById_ShouldThrowAccessDeniedException_WhenOwnerMismatch() {
         Long userId = 1L;
-        Long authId = 999L; // не владелец
+        UserRequest updateRequest = new UserRequest();
+        updateRequest.setEmail("maks@gmail.com");
 
-        UserRequest request = new UserRequest();
-        request.setEmail("whatever@mail.com");
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(999L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setEmail("old@mail.com");
-        existing.setUserCredentialsId(100L);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(authId);
-
-        assertThatThrownBy(() -> userService.updateUserById(userId, request))
+        assertThatThrownBy(() -> userService.updateUserById(userId, updateRequest, 100L))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository, userMapper);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
     }
 
     @Test
-    void updateUserById_ShouldThrowNotFound_WhenUserMissing() {
-
+    void updateUserById_ShouldThrowNotFoundException_WhenUserNotFound() {
         Long userId = 999L;
-        UserRequest request = new UserRequest();
-        request.setEmail("maks@gmail.com");
+        UserRequest updateRequest = new UserRequest();
+        updateRequest.setEmail("maks@gmail.com");
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateUserById(userId, request))
+        assertThatThrownBy(() -> userService.updateUserById(userId, updateRequest, 100L))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User id=999 not found");
 
         verify(userRepository).findById(userId);
         verifyNoMoreInteractions(userRepository, userMapper);
-        jwtUtilsMock.verifyNoInteractions();
     }
 
     @Test
-    void deleteUserById_ShouldDelete_WhenOwnerMatches() {
-
+    void deleteUserById_ShouldDeleteUser_WhenOwnerMatches() {
         Long userId = 1L;
-        Long authId = 100L;
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(100L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setUserCredentialsId(authId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
+        doNothing().when(userRepository).delete(existingUser);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(authId);
-
-        userService.deleteUserById(userId);
+        userService.deleteUserById(userId, 100L);
 
         verify(userRepository).findById(userId);
-        verify(userRepository).delete(existing);
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+        verify(userRepository).delete(existingUser);
     }
 
     @Test
-    void deleteUserById_ShouldThrowNotFound_WhenUserMissing() {
-
+    void deleteUserById_ShouldThrowNotFoundException_WhenUserNotFound() {
         Long userId = 999L;
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.deleteUserById(userId))
+        assertThatThrownBy(() -> userService.deleteUserById(userId, 100L))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User id=999 not found");
 
         verify(userRepository).findById(userId);
-        verifyNoMoreInteractions(userRepository, userMapper);
-        jwtUtilsMock.verifyNoInteractions();
+        verifyNoMoreInteractions(userRepository);
     }
 
     @Test
-    void deleteUserById_ShouldThrowAccessDenied_WhenOwnerMismatch() {
-
+    void deleteUserById_ShouldThrowAccessDeniedException_WhenOwnerMismatch() {
         Long userId = 1L;
+        User existingUser = new User();
+        existingUser.setId(userId);
+        existingUser.setEmail("maks@gmail.com");
+        existingUser.setUserCredentialsId(999L);
 
-        User existing = new User();
-        existing.setId(userId);
-        existing.setUserCredentialsId(100L);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        jwtUtilsMock.when(JwtUtils::getUserCredentialsIdFromToken).thenReturn(999L);
-
-        assertThatThrownBy(() -> userService.deleteUserById(userId))
+        assertThatThrownBy(() -> userService.deleteUserById(userId, 100L))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(userRepository).findById(userId);
-        verify(userRepository, never()).delete(any());
-        jwtUtilsMock.verify(JwtUtils::getUserCredentialsIdFromToken);
+        verifyNoMoreInteractions(userRepository);
     }
 
     @Test

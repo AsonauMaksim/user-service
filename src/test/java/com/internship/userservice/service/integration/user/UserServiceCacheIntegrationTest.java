@@ -4,18 +4,14 @@ import com.internship.userservice.dto.user.UserRequest;
 import com.internship.userservice.dto.user.UserResponse;
 import com.internship.userservice.service.UserService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,12 +29,6 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     private static final String USERS_CACHE = "users";
 
-    private void authenticateAs(long userCredentialsId) {
-        var auth = new UsernamePasswordAuthenticationToken(
-                String.valueOf(userCredentialsId), null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
     @BeforeEach
     void clearCache() {
         Cache cache = cacheManager.getCache(USERS_CACHE);
@@ -47,18 +37,10 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
         if (byEmail != null) byEmail.clear();
     }
 
-    @AfterEach
-    void clearCtx() {
-        SecurityContextHolder.clearContext();
-    }
-
     @Test
     void getUserById_ShouldCacheResult() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest request = createUserRequest();
-        UserResponse savedUser = userService.create(request);
+        UserResponse savedUser = userService.create(request, OWNER_AUTH_ID);
         Long userId = savedUser.getId();
 
         userService.getUserById(userId);
@@ -73,10 +55,7 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateUserById_ShouldUpdateCache() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
-        UserResponse savedUser = userService.create(createUserRequest());
+        UserResponse savedUser = userService.create(createUserRequest(), OWNER_AUTH_ID);
         Long userId = savedUser.getId();
 
         userService.getUserById(userId);
@@ -86,14 +65,13 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
         assertThat(((UserResponse) Objects.requireNonNull(cachedBeforeUpdate.get())).getName())
                 .isEqualTo("Max");
 
-        authenticateAs(OWNER_AUTH_ID);
         UserRequest update = UserRequest.builder()
                 .name("Updated")
                 .surname("User")
                 .birthDate(LocalDate.of(1990, 1, 1))
                 .email("max@gmail.com")
                 .build();
-        userService.updateUserById(userId, update);
+        userService.updateUserById(userId, update, OWNER_AUTH_ID);
 
         Cache.ValueWrapper cachedAfterUpdate =
                 Objects.requireNonNull(cacheManager.getCache(USERS_CACHE)).get(userId);
@@ -107,17 +85,14 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void deleteUserById_ShouldEvictCache() {
-        authenticateAs(OWNER_AUTH_ID);
-
-        UserResponse savedUser = userService.create(createUserRequest());
+        UserResponse savedUser = userService.create(createUserRequest(), OWNER_AUTH_ID);
         Long userId = savedUser.getId();
 
         userService.getUserById(userId);
         assertThat(Objects.requireNonNull(cacheManager.getCache(USERS_CACHE)).get(userId))
                 .isNotNull();
 
-        authenticateAs(OWNER_AUTH_ID);
-        userService.deleteUserById(userId);
+        userService.deleteUserById(userId, OWNER_AUTH_ID);
 
         assertThat(Objects.requireNonNull(cacheManager.getCache(USERS_CACHE)).get(userId))
                 .isNull();
@@ -125,10 +100,7 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getUserByEmail_ShouldCacheResult() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
-        userService.create(createUserRequest());
+        userService.create(createUserRequest(), OWNER_AUTH_ID);
 
         userService.getUserByEmail("max@gmail.com");
 
@@ -141,7 +113,6 @@ public class UserServiceCacheIntegrationTest extends BaseIntegrationTest {
     }
 
     private UserRequest createUserRequest() {
-
         return UserRequest.builder()
                 .name("Max")
                 .surname("Ivanov")

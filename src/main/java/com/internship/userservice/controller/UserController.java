@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,9 +30,11 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest dto) {
+    public ResponseEntity<UserResponse> create(
+            @Valid @RequestBody UserRequest dto,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
 
-        UserResponse saved = userService.create(dto);
+        UserResponse saved = userService.create(dto, userCredentialsId);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
@@ -61,15 +64,20 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest dto) {
+    public ResponseEntity<UserResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UserRequest dto,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
 
-        return ResponseEntity.ok(userService.updateUserById(id, dto));
+        return ResponseEntity.ok(userService.updateUserById(id, dto, userCredentialsId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userCredentialsId) {
 
-        userService.deleteUserById(id);
+        userService.deleteUserById(id, userCredentialsId);
         return ResponseEntity.noContent().build();
     }
 

@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface UserService {
 
-    UserResponse create(UserRequest dto);
+    UserResponse create(UserRequest dto, Long userCredentialsId);
 
     UserResponse getUserById(Long id);
 
@@ -15,12 +15,14 @@ public interface UserService {
 
     List<UserResponse> getUsersByIds(List<Long> ids);
 
-    UserResponse updateUserById(Long id, UserRequest dto);
+    UserResponse updateUserById(Long id, UserRequest dto, Long userCredentialsId);
 
-    void deleteUserById(Long id);
+    void deleteUserById(Long id, Long userCredentialsId);
 
     List<UserResponse> getAllUsers();
 
     UserResponse getByUserCredentialsId(Long userCredentialsId);
+
+
 }
 

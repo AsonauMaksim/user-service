@@ -10,18 +10,14 @@ import com.internship.userservice.repository.CardInfoRepository;
 import com.internship.userservice.service.CardInfoService;
 import com.internship.userservice.service.UserService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,50 +43,32 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     private UserResponse savedUser;
 
-    private void authenticateAs(long userCredentialsId) {
-
-        var auth = new UsernamePasswordAuthenticationToken(
-                String.valueOf(userCredentialsId), null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
     @BeforeEach
     void clearCaches() {
-
         Cache cards = cacheManager.getCache("cards");
         if (cards != null) cards.clear();
     }
 
     @BeforeEach
     void initUser() {
-
-        authenticateAs(OWNER_AUTH_ID);
         UserRequest user = UserRequest.builder()
                 .name("Max")
                 .surname("Ivanov")
                 .birthDate(LocalDate.of(1995, 10, 17))
                 .email("max@gmail.com")
                 .build();
-        savedUser = userService.create(user);
-    }
-
-    @AfterEach
-    void clearCtx() {
-        SecurityContextHolder.clearContext();
+        savedUser = userService.create(user, OWNER_AUTH_ID);
     }
 
     @Test
     void create_ShouldSaveCard() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
                 .build();
 
-        CardInfoResponse response = cardInfoService.create(request);
+        CardInfoResponse response = cardInfoService.create(request, OWNER_AUTH_ID);
 
         assertThat(response.getId()).isNotNull();
         assertThat(response.getNumber()).isEqualTo("1111222233334444");
@@ -100,50 +78,41 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void create_ShouldThrow_WhenCardNumberAlreadyExists() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
                 .build();
 
-        cardInfoService.create(request);
+        cardInfoService.create(request, OWNER_AUTH_ID);
 
-        assertThatThrownBy(() -> cardInfoService.create(request))
+        assertThatThrownBy(() -> cardInfoService.create(request, OWNER_AUTH_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("Card number '1111222233334444' already exists");
     }
 
     @Test
     void create_ShouldThrow_WhenOwnerUserNotFound() {
-
-        authenticateAs(9999L);
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Ghost Owner")
                 .expirationDate("01/30")
                 .build();
 
-        assertThatThrownBy(() -> cardInfoService.create(request))
+        assertThatThrownBy(() -> cardInfoService.create(request, 9999L))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("User with credentials id=9999 not found");
     }
 
     @Test
     void getCardById_ShouldReturnCard() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("9999888877776666")
                 .holder("Max Ivanov")
                 .expirationDate("12/30")
                 .build();
 
-        CardInfoResponse savedCard = cardInfoService.create(request);
+        CardInfoResponse savedCard = cardInfoService.create(request, OWNER_AUTH_ID);
 
         CardInfoResponse foundCard = cardInfoService.getCardById(savedCard.getId());
 
@@ -155,7 +124,6 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getCardById_ShouldThrow_WhenNotFound() {
-
         Long nonExistentId = 1488L;
 
         assertThatThrownBy(() -> cardInfoService.getCardById(nonExistentId))
@@ -165,20 +133,17 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getAllByIds_ShouldReturnCards() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoResponse card1 = cardInfoService.create(CardInfoRequest.builder()
                 .number("1111222233330001")
                 .holder("Ivan Ivanov")
                 .expirationDate("01/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         CardInfoResponse card2 = cardInfoService.create(CardInfoRequest.builder()
                 .number("1111222233330002")
                 .holder("Sveta Svetikova")
                 .expirationDate("02/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         List<CardInfoResponse> cards = cardInfoService.getAllByIds(List.of(card1.getId(), card2.getId()));
 
@@ -196,20 +161,17 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getByUserId_ShouldReturnCardsForUser() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         cardInfoService.create(CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Max Ivanov")
                 .expirationDate("05/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         cardInfoService.create(CardInfoRequest.builder()
                 .number("4444333322221111")
                 .holder("Max Ivanov")
                 .expirationDate("06/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         List<CardInfoResponse> cards = cardInfoService.getByUserId(savedUser.getId());
 
@@ -219,21 +181,17 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getByUserId_ShouldReturnEmptyList_WhenUserHasNoCards() {
-
         List<CardInfoResponse> cards = cardInfoService.getByUserId(savedUser.getId());
         assertThat(cards).isEmpty();
     }
 
     @Test
     void update_ShouldUpdateCardSuccessfully() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoResponse saved = cardInfoService.create(CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         CardInfoRequest update = CardInfoRequest.builder()
                 .number("1111222233334444")
@@ -241,7 +199,7 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
                 .expirationDate("12/30")
                 .build();
 
-        CardInfoResponse updated = cardInfoService.update(saved.getId(), update);
+        CardInfoResponse updated = cardInfoService.update(saved.getId(), update, OWNER_AUTH_ID);
 
         assertThat(updated.getHolder()).isEqualTo("Sveta Svetikova");
         assertThat(updated.getExpirationDate()).isEqualTo("12/30");
@@ -249,20 +207,17 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void update_ShouldThrowAlreadyExistsException_WhenCardNumberExists() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         cardInfoService.create(CardInfoRequest.builder()
                 .number("1111222233330000")
                 .holder("First")
                 .expirationDate("01/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         CardInfoResponse cardToUpdate = cardInfoService.create(CardInfoRequest.builder()
                 .number("9999888877770000")
                 .holder("Second")
                 .expirationDate("01/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         CardInfoRequest update = CardInfoRequest.builder()
                 .number("1111222233330000")
@@ -270,23 +225,18 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
                 .expirationDate("12/30")
                 .build();
 
-        assertThatThrownBy(() -> cardInfoService.update(cardToUpdate.getId(), update))
+        assertThatThrownBy(() -> cardInfoService.update(cardToUpdate.getId(), update, OWNER_AUTH_ID))
                 .isInstanceOf(AlreadyExistsException.class)
                 .hasMessageContaining("already exists");
     }
 
     @Test
     void update_ShouldThrowAccessDenied_WhenOwnerMismatch() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoResponse saved = cardInfoService.create(CardInfoRequest.builder()
                 .number("1234123412341234")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
-                .build());
-
-        authenticateAs(OTHER_AUTH_ID);
+                .build(), OWNER_AUTH_ID);
 
         CardInfoRequest update = CardInfoRequest.builder()
                 .number("1234123412341234")
@@ -294,73 +244,57 @@ public class CardInfoServiceIntegrationTest extends BaseIntegrationTest {
                 .expirationDate("02/31")
                 .build();
 
-        assertThatThrownBy(() -> cardInfoService.update(saved.getId(), update))
+        assertThatThrownBy(() -> cardInfoService.update(saved.getId(), update, OTHER_AUTH_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }
 
     @Test
     void update_ShouldThrowNotFoundException_WhenCardNotFound() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoRequest update = CardInfoRequest.builder()
                 .number("1111222233330000")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
                 .build();
 
-        assertThatThrownBy(() -> cardInfoService.update(1488L, update))
+        assertThatThrownBy(() -> cardInfoService.update(1488L, update, OWNER_AUTH_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Card id=1488 not found");
     }
 
-
     @Test
     void delete_ShouldRemoveCardSuccessfully() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoResponse saved = cardInfoService.create(CardInfoRequest.builder()
                 .number("5555666677778888")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
         Long cardId = saved.getId();
 
         assertThat(cardInfoRepository.existsById(cardId)).isTrue();
 
-        authenticateAs(OWNER_AUTH_ID);
-        cardInfoService.delete(cardId);
+        cardInfoService.delete(cardId, OWNER_AUTH_ID);
 
         assertThat(cardInfoRepository.existsById(cardId)).isFalse();
     }
 
     @Test
     void delete_ShouldThrowNotFoundException_WhenCardDoesNotExist() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
-        assertThatThrownBy(() -> cardInfoService.delete(1488L))
+        assertThatThrownBy(() -> cardInfoService.delete(1488L, OWNER_AUTH_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Card id=1488 not found");
     }
 
     @Test
     void delete_ShouldThrowAccessDenied_WhenOwnerMismatch() {
-
-        authenticateAs(OWNER_AUTH_ID);
-
         CardInfoResponse saved = cardInfoService.create(CardInfoRequest.builder()
                 .number("1010101010101010")
                 .holder("Max Ivanov")
                 .expirationDate("10/30")
-                .build());
+                .build(), OWNER_AUTH_ID);
 
-        authenticateAs(OTHER_AUTH_ID);
-
-        assertThatThrownBy(() -> cardInfoService.delete(saved.getId()))
+        assertThatThrownBy(() -> cardInfoService.delete(saved.getId(), OTHER_AUTH_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }

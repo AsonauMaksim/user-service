@@ -6,18 +6,14 @@ import com.internship.userservice.dto.user.UserRequest;
 import com.internship.userservice.service.CardInfoService;
 import com.internship.userservice.service.UserService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.Objects;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -38,50 +34,32 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     private static final String CARDS_CACHE = "cards";
 
-    private void authenticateAs(long userCredentialsId) {
-
-        var auth = new UsernamePasswordAuthenticationToken(
-                String.valueOf(userCredentialsId), null, Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
     @BeforeEach
     void setUp() {
-
         clearCache();
-        authenticateAs(OWNER_AUTH_ID);
-
         UserRequest user = UserRequest.builder()
                 .name("Max")
                 .surname("Ivanov")
                 .birthDate(LocalDate.of(1995, 10, 17))
                 .email("max@gmail.com")
                 .build();
-        userService.create(user);
-    }
-
-    @AfterEach
-    void clearCtx() {
-
-        SecurityContextHolder.clearContext();
+        userService.create(user, OWNER_AUTH_ID);
     }
 
     private void clearCache() {
-
         Cache cache = cacheManager.getCache(CARDS_CACHE);
         if (cache != null) cache.clear();
     }
 
     @Test
     void getCardById_ShouldCacheResult() {
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("1111222233334444")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
                 .build();
 
-        CardInfoResponse savedCard = cardInfoService.create(request);
+        CardInfoResponse savedCard = cardInfoService.create(request, OWNER_AUTH_ID);
         cardInfoService.getCardById(savedCard.getId());
 
         Cache.ValueWrapper cached =
@@ -94,13 +72,12 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void update_ShouldUpdateCache() {
-
         CardInfoRequest createRequest = CardInfoRequest.builder()
                 .number("2222333344445555")
                 .holder("Max Ivanov")
                 .expirationDate("01/30")
                 .build();
-        CardInfoResponse savedCard = cardInfoService.create(createRequest);
+        CardInfoResponse savedCard = cardInfoService.create(createRequest, OWNER_AUTH_ID);
 
         cardInfoService.getCardById(savedCard.getId());
         Cache.ValueWrapper beforeUpdate =
@@ -114,7 +91,7 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
                 .holder("Sveta Svetikova")
                 .expirationDate("12/30")
                 .build();
-        cardInfoService.update(savedCard.getId(), updateRequest);
+        cardInfoService.update(savedCard.getId(), updateRequest, OWNER_AUTH_ID);
 
         Cache.ValueWrapper afterUpdate =
                 Objects.requireNonNull(cacheManager.getCache(CARDS_CACHE)).get(savedCard.getId());
@@ -128,14 +105,13 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void delete_ShouldEvictCache() {
-
         CardInfoRequest request = CardInfoRequest.builder()
                 .number("1234432112344321")
                 .holder("Max Ivanov")
                 .expirationDate("11/30")
                 .build();
 
-        CardInfoResponse savedCard = cardInfoService.create(request);
+        CardInfoResponse savedCard = cardInfoService.create(request, OWNER_AUTH_ID);
         Long cardId = savedCard.getId();
 
         cardInfoService.getCardById(cardId);
@@ -143,7 +119,7 @@ public class CardInfoServiceCacheIntegrationTest extends BaseIntegrationTest {
         assertThat(Objects.requireNonNull(cacheManager.getCache(CARDS_CACHE)).get(cardId))
                 .isNotNull();
 
-        cardInfoService.delete(cardId);
+        cardInfoService.delete(cardId, OWNER_AUTH_ID);
 
         assertThat(Objects.requireNonNull(cacheManager.getCache(CARDS_CACHE)).get(cardId))
                 .isNull();
