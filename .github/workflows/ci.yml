@@ -2,7 +2,7 @@ name: User Service CI Pipeline
 
 on:
   push:
-    branches: [ main, feature/user-auth-integration ]
+    branches: [ main, feature/user-auth-integration, feature/remove-jwt ]
   pull_request:
     branches: [ main ]
 
