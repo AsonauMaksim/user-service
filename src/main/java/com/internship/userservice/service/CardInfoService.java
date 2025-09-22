@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface CardInfoService {
 
-    CardInfoResponse create(CardInfoRequest dto);
+    CardInfoResponse create(CardInfoRequest dto, Long userCredentialsId);
 
     CardInfoResponse getCardById(Long id);
 
@@ -15,7 +15,7 @@ public interface CardInfoService {
 
     List<CardInfoResponse> getByUserId(Long userId);
 
-    CardInfoResponse update(Long id, CardInfoRequest dto);
+    CardInfoResponse update(Long id, CardInfoRequest dto, Long userCredentialsId);
 
-    void delete(Long id);
+    void delete(Long id, Long userCredentialsId);
 }

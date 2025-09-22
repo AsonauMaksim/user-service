@@ -5,24 +5,17 @@ import com.internship.userservice.dto.user.UserRequest;
 import com.internship.userservice.dto.user.UserResponse;
 import com.internship.userservice.entity.User;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.service.JwtService;
 import com.internship.userservice.service.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
-
-
 import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -30,14 +23,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.hamcrest.Matchers.hasItem;
 
 @Sql(scripts = "classpath:/sql/cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     private static final long AUTH_SUBJECT_ID = 777L;
-    private static final String AUTH_HEADER = "Authorization";
-    private static final String BEARER = "Bearer test-token";
+    private static final String USER_ID_HEADER = "X-User-Id";
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,18 +39,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @MockBean
-    private JwtService jwtService;
-
-    @BeforeEach
-    void mockJwt() {
-
-        when(jwtService.isTokenValid(anyString())).thenReturn(true);
-        when(jwtService.extractUserId(anyString())).thenReturn(AUTH_SUBJECT_ID);
-    }
-
     private UserRequest createUserRequest() {
-
         return UserRequest.builder()
                 .name("Max")
                 .surname("Ivanov")
@@ -70,11 +50,10 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void createUser_ShouldReturn201AndSaveUser() throws Exception {
-
         UserRequest request = createUserRequest();
 
         mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -91,7 +70,6 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void createUser_ShouldReturn400_WhenInvalidInput() throws Exception {
-
         UserRequest request = UserRequest.builder()
                 .name("")
                 .surname("Ivanov")
@@ -100,7 +78,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -115,9 +93,8 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getUserById_ShouldReturn200AndUser_WhenExists() throws Exception {
-
         String responseJson = mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createUserRequest())))
                 .andExpect(status().isCreated())
@@ -126,7 +103,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
         UserResponse created = objectMapper.readValue(responseJson, UserResponse.class);
 
         mockMvc.perform(get("/api/users/{id}", created.getId())
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(created.getId()))
@@ -138,11 +115,10 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getUserById_ShouldReturn404_WhenUserNotFound() throws Exception {
-
         long nonExistingId = 1488L;
 
         mockMvc.perform(get("/api/users/{id}", nonExistingId)
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -153,7 +129,6 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getAllUsers_ShouldReturn200AndListOfUsers() throws Exception {
-
         userRepository.save(User.builder()
                 .name("Alice")
                 .surname("Wonderland")
@@ -171,7 +146,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         mockMvc.perform(get("/api/users/all")
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.length()").value(2))
@@ -181,9 +156,8 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateUser_ShouldReturn200AndUpdatedUser_WhenValid() throws Exception {
-
         String createdJson = mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 UserRequest.builder()
@@ -205,7 +179,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/users/{id}", created.getId())
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -216,9 +190,8 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateUser_ShouldReturn400_WhenInvalidInput() throws Exception {
-
         String createdJson = mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 UserRequest.builder()
@@ -240,7 +213,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/users/{id}", created.getId())
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidUpdate)))
                 .andExpect(status().isBadRequest())
@@ -253,7 +226,6 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void updateUser_ShouldReturn404_WhenUserNotFound() throws Exception {
-
         long nonExistentId = 1488L;
 
         UserRequest request = UserRequest.builder()
@@ -264,7 +236,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/users/{id}", nonExistentId)
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -277,9 +249,8 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void deleteUser_ShouldReturn204_WhenUserDeleted() throws Exception {
-
         String createdJson = mockMvc.perform(post("/api/users")
-                        .header(AUTH_HEADER, BEARER)
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createUserRequest())))
                 .andExpect(status().isCreated())
@@ -288,7 +259,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
         UserResponse created = objectMapper.readValue(createdJson, UserResponse.class);
 
         mockMvc.perform(delete("/api/users/{id}", created.getId())
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isNoContent());
 
         assertThat(userRepository.findById(created.getId())).isEmpty();
@@ -296,11 +267,10 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void deleteUser_ShouldReturn404_WhenUserNotFound() throws Exception {
-
         long nonExistingId = 1488L;
 
         mockMvc.perform(delete("/api/users/{id}", nonExistingId)
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
@@ -311,7 +281,6 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void getByUserCredentialsId_ShouldReturnUser_WhenExists() throws Exception {
-
         User user = User.builder()
                 .userCredentialsId(AUTH_SUBJECT_ID)
                 .name("Bob")
@@ -322,7 +291,7 @@ public class UserControllerIntegrationTest extends BaseIntegrationTest {
         user = userRepository.save(user);
 
         mockMvc.perform(get("/api/users/by-credentials-id/" + AUTH_SUBJECT_ID)
-                        .header(AUTH_HEADER, BEARER))
+                        .header(USER_ID_HEADER, AUTH_SUBJECT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(user.getId()))
                 .andExpect(jsonPath("$.email").value(user.getEmail()))

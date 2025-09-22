@@ -37,10 +37,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: user-service
-    ports:
-      - "8081:8081"
-    environment:
-      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

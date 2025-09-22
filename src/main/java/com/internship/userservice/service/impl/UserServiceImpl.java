@@ -7,7 +7,6 @@ import com.internship.userservice.exception.AlreadyExistsException;
 import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.mapper.UserMapper;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -29,18 +28,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponse create(UserRequest dto) {
+    public UserResponse create(UserRequest dto, Long userCredentialsId) {
 
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new AlreadyExistsException("User with email '" + dto.getEmail() + "' already exists");
         }
-
-        Long authId = JwtUtils.getUserCredentialsIdFromToken();
-
         User user = userMapper.toEntity(dto);
-        user.setUserCredentialsId(authId);
-
-        return userMapper.toDto(userRepository.save(user));
+        user.setUserCredentialsId(userCredentialsId);
+        User saved = userRepository.save(user);
+        return userMapper.toDto(saved);
     }
 
     @Override
@@ -70,40 +66,33 @@ public class UserServiceImpl implements UserService {
     @Override
     @CachePut(value = "users", key = "#id")
     @CacheEvict(value = "usersByEmail", key = "#dto.email")
-    public UserResponse updateUserById(Long id, UserRequest dto) {
+    public UserResponse updateUserById(Long id, UserRequest dto, Long userCredentialsId) {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User id=" + id + " not found"));
 
-        Long authId = JwtUtils.getUserCredentialsIdFromToken();
-
-        if (!authId.equals(user.getUserCredentialsId())) {
+        if (!userCredentialsId.equals(user.getUserCredentialsId())) {
             throw new AccessDeniedException("Access denied");
         }
-
         if (!user.getEmail().equals(dto.getEmail()) &&
                 userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new AlreadyExistsException("Email '" + dto.getEmail() + "' already in use");
         }
-
         userMapper.updateEntity(user, dto);
-
         return userMapper.toDto(user);
     }
 
     @Transactional
     @Override
     @CacheEvict(value = "users", key = "#id")
-    public void deleteUserById(Long id) {
+    public void deleteUserById(Long id, Long userCredentialsId) {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User id=" + id + " not found"));
 
-        Long authId = JwtUtils.getUserCredentialsIdFromToken();
-        if (!authId.equals(user.getUserCredentialsId())) {
+        if (!userCredentialsId.equals(user.getUserCredentialsId())) {
             throw new AccessDeniedException("Access denied");
         }
-
         userRepository.delete(user);
     }
 

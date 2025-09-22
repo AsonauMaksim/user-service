@@ -10,7 +10,6 @@ import com.internship.userservice.exception.NotFoundException;
 import com.internship.userservice.mapper.CardInfoMapper;
 import com.internship.userservice.repository.CardInfoRepository;
 import com.internship.userservice.repository.UserRepository;
-import com.internship.userservice.security.JwtUtils;
 import com.internship.userservice.service.CardInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.CacheManager;
@@ -42,9 +41,7 @@ public class CardInfoServiceImpl implements CardInfoService {
 
     @Override
     @Transactional
-    public CardInfoResponse create(CardInfoRequest dto) {
-
-        Long userCredentialsId = JwtUtils.getUserCredentialsIdFromToken();
+    public CardInfoResponse create(CardInfoRequest dto, Long userCredentialsId) {
 
         User owner = userRepository.findByUserCredentialsId(userCredentialsId)
                 .orElseThrow(() -> new NotFoundException("User with credentials id=" + userCredentialsId + " not found"));
@@ -82,8 +79,7 @@ public class CardInfoServiceImpl implements CardInfoService {
     @Override
     @Transactional
     @CachePut(value = "cards", key = "#id")
-    public CardInfoResponse update(Long id, CardInfoRequest dto) {
-        Long userCredentialsId = JwtUtils.getUserCredentialsIdFromToken();
+    public CardInfoResponse update(Long id, CardInfoRequest dto, Long userCredentialsId) {
 
         CardInfo card = cardInfoRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Card id=" + id + " not found"));
@@ -108,8 +104,7 @@ public class CardInfoServiceImpl implements CardInfoService {
     @Override
     @Transactional
     @CacheEvict(value = "cards", key = "#id")
-    public void delete(Long id) {
-        Long userCredentialsId = JwtUtils.getUserCredentialsIdFromToken();
+    public void delete(Long id, Long userCredentialsId) {
 
         CardInfo card = cardInfoRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Card id=" + id + " not found"));
